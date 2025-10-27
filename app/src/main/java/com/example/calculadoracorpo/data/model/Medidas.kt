@@ -1,19 +1,6 @@
 package com.example.calculadoracorpo.data.model
 
-/**
-* @param peso em quilogramas (ex: 70.3)
-* @param altura em cm (ex: 178)
-*
-*  ## Dobras Cutâneas (em milimetros) --
-* Usamos Double? (nullable) para o caso da avalição preencher apenas 3 dobras e não as 7.
-* @param coxa (Usada no P3-Masculino,Feminino e P7)
-* @param peitoral (Usada no P3-Masculino e P7)
-* @param abdominal (Usada no P3-Masculino e P7)
-* @param tricipital (Usada no P3-Feminino e P7)
-* @param supraIliaca (Usada no P3-Feminino e P7)
-* @param subescapular (Usado no P7)
-* @param axilarMedia (Usada no P7)
-*/
+// [Os comentários Javadoc foram omitidos para focar no código]
 
 import androidx.room.Entity
 import androidx.room.ForeignKey
@@ -26,26 +13,43 @@ import java.time.LocalDate
         childColumns = ["pacienteId"], onDelete = ForeignKey.CASCADE)],
     indices = [Index("pacienteId")]
 )
-
 data class Medidas (
     @PrimaryKey val id:Int,
     val pacienteId: Int,
     val dataAvaliacao: LocalDate,
+
+    // Altura e peso são os dados de entrada principais, mantidos como Double?
     val altura: Double?,
     val peso: Double?,
+
+    // O Protocolo é um ENUM ou Data Class, assumindo Protocolo já está definido
     val protocoloUsado: Protocolo,
+
+    // Dobras Cutâneas - Manter Nulável no banco de dados (Room)
     val peitoral: Double?,
     val abdominal: Double?,
-    val triceps: Double?,
+    val triceps: Double?, // Nota: Renomeado para 'triceps' no seu Repositório anterior, mas mantido aqui como 'triceps'
     val axilarMedia: Double?,
     val subescapular: Double?,
     val supraIliaca: Double?,
     val coxa: Double?,
 ) {
+    // Propriedade calculada do IMC (Ok, usa Elvis para prevenir 0.0)
     val imc: Double?
         get(){
             if (peso == null || altura == null || altura == 0.0) return null
             val alturaEmMetros = altura/100.0
             return peso/(alturaEmMetros * alturaEmMetros)
         }
+
+    // NOVA PROPRIEDADE CALCULADA: Para somar as dobras com segurança (0.0 se for null)
+    // Usada no Repositório.
+    val somaDobrasNaoNula: Double
+        get() = (peitoral ?: 0.0) +
+                (axilarMedia ?: 0.0) +
+                (triceps ?: 0.0) +
+                (subescapular ?: 0.0) +
+                (abdominal ?: 0.0) +
+                (supraIliaca ?: 0.0) +
+                (coxa ?: 0.0)
 }

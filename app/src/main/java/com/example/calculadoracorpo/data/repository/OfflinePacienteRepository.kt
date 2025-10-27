@@ -12,7 +12,6 @@ import java.time.LocalDate
 
 /** * Implementação concreta do Repositório que lida com as fontes de dados locais (Room)
  * e executa a lógica de cálculo da avaliação física.
- * (Seguindo a convenção 'Offline' vista nas aulas de Room [cite: 2288]).
  */
 class OfflinePacienteRepository(
     private val pacienteDao: PacienteDao,
@@ -24,7 +23,6 @@ class OfflinePacienteRepository(
     suspend fun excluirPaciente(paciente: Paciente) = pacienteDao.deletar(paciente)
     suspend fun buscarPaciente(id: Int): Paciente? = pacienteDao.buscarPorId(id)
 
-    // O parâmetro 'paciente: Paciente' foi removido, pois não é usado em buscarTodos()
     fun listarTodosPacientes(): Flow<List<Paciente>> = pacienteDao.buscarTodos()
 
     // --- CRUD Das Medidas / Avaliações ---
@@ -32,16 +30,12 @@ class OfflinePacienteRepository(
     fun buscarAvaliacoes(pacienteId: Int): Flow<List<Medidas>> {
         return medidasDao.buscarAvaliacoesdoPaciente(pacienteId)
     }
-
     suspend fun buscarPrimeiraAvaliacao(pacienteId: Int): Medidas? {
         return medidasDao.buscarPrimeiraAvaliacao(pacienteId)
     }
-
     suspend fun buscarUltimaAvaliacao(pacienteId: Int): Medidas? {
         return medidasDao.buscarUltimaAvaliacao(pacienteId)
     }
-
-    // ATENÇÃO: Verifique se o tipo do ID no DAO é String ou Int para consistência.
     suspend fun buscarAvaliacaoAnterior(pacienteId: String, dataAtual: LocalDate): Medidas? {
         return medidasDao.buscarAvaliacaoAnterior(pacienteId, dataAtual)
     }
@@ -51,36 +45,38 @@ class OfflinePacienteRepository(
     /**
      * Realiza os cálculos de IMC/Composição Corporal, insere as medidas de entrada
      * no Room e retorna o objeto ResultadoAvaliacao.
-     * * Usa Coroutines e Dispatchers.IO para a execução segura da lógica e E/S[cite: 2294, 2295].
      */
     suspend fun realizarESalvarAvaliacao(
         pacienteId: Long,
-        peso: Double,
-        alturaCm: Int,
+        // REMOVIDOS peso e alturaCm daqui, pois serão obtidos da Medidas
         idade: Int,
-        medidas: Medidas
+        medidas: Medidas // Contém peso, altura, e dobras
     ): ResultadoAvaliacao {
 
-        // Garante que o processamento pesado e o acesso ao banco de dados
-        // ocorram em uma thread de I/O[cite: 2296, 2099].
         return withContext(Dispatchers.IO) {
 
+            // Extrai peso e altura da Medidas, usando 0.0 caso sejam nulos ou 0
+            val pesoKg = medidas.peso ?: 0.0
+            val alturaCm = medidas.altura ?: 0.0
+
+            if (pesoKg <= 0.0 || alturaCm <= 0.0) {
+                throw IllegalArgumentException("Peso e altura devem ser valores válidos para o cálculo.")
+            }
+
             // 1. Cálculos de Risco (IMC)
-            val imc = calcularIMC(peso, alturaCm)
+            val imc = calcularIMC(pesoKg, alturaCm.toInt())
             val classificacaoImc = classificarIMC(imc)
 
-            // 2. Coleta de Medidas de Entrada
-            val somaDobras = medidas.peitoral + medidas.axilarMedia + medidas.triceps +
-                    medidas.subescapular + medidas.abdominal + medidas.suprailiaca +
-                    medidas.coxa
+            // 2. Coleta de Medidas de Entrada (USANDO PROPRIEDADE NÂO-NULA)
+            val somaDobras = medidas.somaDobrasNaoNula
 
             // 3. Cálculos Complexos (Densidade Corporal e % Gordura)
             val densidadeCorporal = calcularDensidadeCorporal(somaDobras, idade)
             val percentualGordura = calcularPercentualGordura(densidadeCorporal)
 
             // 4. Cálculos Finais de Massa
-            val massaGordaKg = (peso * percentualGordura) / 100.0
-            val massaMagraKg = peso - massaGordaKg
+            val massaGordaKg = (pesoKg * percentualGordura) / 100.0
+            val massaMagraKg = pesoKg - massaGordaKg
 
             // 5. Persistência da Medida de Entrada (Room)
             medidasDao.inserir(medidas)
@@ -109,7 +105,6 @@ class OfflinePacienteRepository(
     }
 
     private fun classificarIMC(imc: Double): String {
-        // Usa a estrutura de desvio 'when' [cite: 506]
         return when {
             imc < 18.5 -> "Baixo Peso"
             imc < 25.0 -> "Peso Normal"
@@ -119,12 +114,10 @@ class OfflinePacienteRepository(
     }
 
     private fun calcularDensidadeCorporal(somaDobras: Double, idade: Int): Double {
-        // FÓRMULA EXEMPLO para demonstração da lógica de cálculo.
         return 1.112 - (0.00043499 * somaDobras) + (0.00000055 * (somaDobras * somaDobras)) - (0.00028826 * idade)
     }
 
     private fun calcularPercentualGordura(densidadeCorporal: Double): Double {
-        // Fórmula de Siri: %G = (495 / D) - 450
         return (495.0 / densidadeCorporal) - 450.0
     }
 }

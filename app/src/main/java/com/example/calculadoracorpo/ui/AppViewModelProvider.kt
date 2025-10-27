@@ -1,38 +1,65 @@
-package com.example.calculadoracorpo.di // Coloque no pacote di ou ui
+package com.example.calculadoracorpo.ui
 
-import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.calculadoracorpo.CalculadoraCorpoApplication
-import com.example.calculadoracorpo.ui.screens.MainScreenViewModel // Corrija o import se mover o ViewModel
+import com.example.calculadoracorpo.data.repository.OfflinePacienteRepository
+import com.example.calculadoracorpo.ui.medidas.MedidasEntryViewModel
+import com.example.calculadorcorpo.ui.paciente.detail.PacienteDetailViewModel
+import com.example.calculadorcorpo.ui.paciente.edit.PacienteEditViewModel
+import com.example.calculadoracorpo.ui.paciente.list.PacienteListViewModel
+import com.example.calculadorocorpo.ui.resultado.ResultadoViewModel
 
 /**
- * Factory Provider para todos os ViewModels da aplicação.
+ * Fornecedor de Factory para a criação de ViewModels.
+ * Garante que cada ViewModel receba as dependências corretas (como o Repositório).
  */
 object AppViewModelProvider {
-    val Factory: ViewModelProvider.Factory = viewModelFactory {
-        // --- Inicializador para MainScreenViewModel ---
+    val Factory = viewModelFactory {
+
+        // --- 1. PacienteListViewModel ---
         initializer {
-            val application = calculadoraCorpoApplication()
-            // Obtém as instâncias da Application
-            val repository = application.pacienteRepository
-            val calculadora = application.calculadoraGorduraCorporal
-            // Cria o ViewModel passando as dependências
-            MainScreenViewModel(
-                pacienteRepository = repository, // Usaremos para salvar/carregar no futuro
-                calculadoraGordura = calculadora
+            PacienteListViewModel(
+                calculadoraCorpoApplication().container.pacienteRepository as OfflinePacienteRepository
             )
         }
 
-        // --- Adicione inicializadores para outros ViewModels aqui ---
+        // --- 2. PacienteDetailViewModel ---
+        initializer {
+            PacienteDetailViewModel(
+                this.createSavedStateHandle(),
+                calculadoraCorpoApplication().container.pacienteRepository as OfflinePacienteRepository
+            )
+        }
+
+        // --- 3. PacienteEditViewModel ---
+        initializer {
+            PacienteEditViewModel(
+                this.createSavedStateHandle(),
+                calculadoraCorpoApplication().container.pacienteRepository as OfflinePacienteRepository
+            )
+        }
+
+        // --- 4. ResultadoViewModel ---
+        initializer {
+            ResultadoViewModel(
+                repository = calculadoraCorpoApplication().container.pacienteRepository as OfflinePacienteRepository
+            )
+        }
+
+        // --- 5. MedidasEntryViewModel ---
+        initializer {
+            MedidasEntryViewModel(
+                pacienteRepository = calculadoraCorpoApplication().container.pacienteRepository as OfflinePacienteRepository
+            )
+        }
     }
 }
 
 /**
- * Extension function para acessar facilmente a instância da Application
- * a partir das CreationExtras dentro dos inicializadores da Factory.
+ * Função de extensão que resolve a referência à classe Application.
  */
-fun CreationExtras.calculadoraCorpoApplication(): CalculadoraCorpoApplication {
-    return (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as CalculadoraCorpoApplication)
-}
+fun CreationExtras.calculadoraCorpoApplication(): CalculadoraCorpoApplication =
+    (this[APPLICATION_KEY] as CalculadoraCorpoApplication)

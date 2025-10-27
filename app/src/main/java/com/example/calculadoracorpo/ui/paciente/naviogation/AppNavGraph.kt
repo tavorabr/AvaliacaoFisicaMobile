@@ -7,24 +7,27 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.calculadoracorpo.ui.medidas.TelaEntradaMedidas
 import com.example.calculadoracorpo.ui.paciente.detail.PacienteDetailScreen
 import com.example.calculadoracorpo.ui.paciente.edit.PacienteEditScreen
 import com.example.calculadoracorpo.ui.paciente.list.TelaListaPacientes
-// Importe as telas de Medidas aqui quando criá-las
+import com.example.calculadoracorpo.ui.resultado.TelaResultado
+import com.example.calculadoracorpo.ui.resultado.ResultadoViewModel
 
-// Define as rotas como constantes
 object Routes {
     const val PACIENTE_LIST = "pacienteList"
-    const val PACIENTE_DETAIL = "pacienteDetail" // Precisa de ID
-    const val PACIENTE_EDIT = "pacienteEdit"   // Pode precisar de ID (para editar)
-    const val PACIENTE_ADD = "pacienteAdd"     // Rota específica para adicionar
+    const val PACIENTE_DETAIL = "pacienteDetail"
+    const val PACIENTE_EDIT = "pacienteEdit"
+    const val PACIENTE_ADD = "pacienteAdd"
+    const val MEDIDAS_ENTRY = "medidasEntry"
+    const val RESULTADO_AVALIACAO = "resultadoAvaliacao"
 
-    // Argumentos
     const val ARG_PACIENTE_ID = "pacienteId"
 
-    // Rotas completas com argumentos
     fun pacienteDetailRoute(pacienteId: Int) = "$PACIENTE_DETAIL/$pacienteId"
     fun pacienteEditRoute(pacienteId: Int) = "$PACIENTE_EDIT/$pacienteId"
+    fun medidasEntryRoute(pacienteId: Int) = "$MEDIDAS_ENTRY/$pacienteId"
 }
 
 @Composable
@@ -34,61 +37,76 @@ fun AppNavGraph(
 ) {
     NavHost(
         navController = navController,
-        startDestination = Routes.PACIENTE_LIST, // Tela inicial
+        startDestination = Routes.PACIENTE_LIST,
         modifier = modifier
     ) {
-        // --- Tela Lista de Pacientes ---
         composable(route = Routes.PACIENTE_LIST) {
             TelaListaPacientes(
                 onPacienteClick = { pacienteId ->
                     navController.navigate(Routes.pacienteDetailRoute(pacienteId))
                 },
                 onAddPacienteClick = {
-                    navController.navigate(Routes.PACIENTE_ADD) // Navega para adicionar
+                    navController.navigate(Routes.PACIENTE_ADD)
                 }
             )
         }
 
-        // --- Tela Adicionar Paciente ---
         composable(route = Routes.PACIENTE_ADD) {
             PacienteEditScreen(
-                onSaveComplete = { navController.popBackStack() }, // Volta após salvar
-                onCancel = { navController.popBackStack() }      // Volta ao cancelar
-                // pacienteId será nulo aqui (modo de adição)
+                onSaveComplete = { navController.popBackStack() },
+                onCancel = { navController.popBackStack() }
             )
         }
 
-        // --- Tela Editar Paciente ---
         composable(
             route = "${Routes.PACIENTE_EDIT}/{${Routes.ARG_PACIENTE_ID}}",
             arguments = listOf(navArgument(Routes.ARG_PACIENTE_ID) { type = NavType.IntType })
         ) {
-            // O ID é obtido automaticamente pelo ViewModel via SavedStateHandle
             PacienteEditScreen(
-                onSaveComplete = { navController.popBackStack(Routes.PACIENTE_LIST, false) }, // Volta para a lista
-                onCancel = { navController.popBackStack() } // Volta para a tela anterior (detalhes)
+                onSaveComplete = { navController.popBackStack(Routes.PACIENTE_LIST, false) },
+                onCancel = { navController.popBackStack() }
             )
         }
 
-        // --- Tela Detalhes do Paciente ---
         composable(
             route = "${Routes.PACIENTE_DETAIL}/{${Routes.ARG_PACIENTE_ID}}",
             arguments = listOf(navArgument(Routes.ARG_PACIENTE_ID) { type = NavType.IntType })
         ) { backStackEntry ->
-            // O ID é obtido automaticamente pelo ViewModel via SavedStateHandle
-            val pacienteId = backStackEntry.arguments?.getInt(Routes.ARG_PACIENTE_ID) ?: -1 // Segurança
+            val pacienteId = backStackEntry.arguments?.getInt(Routes.ARG_PACIENTE_ID) ?: -1
             PacienteDetailScreen(
                 onEditClick = { navController.navigate(Routes.pacienteEditRoute(pacienteId)) },
-                onAddMedidaClick = { /* TODO: Navegar para TelaEdicaoMedidas */ },
-                onMedidaClick = { medidaId -> /* TODO: Navegar para TelaDetalhesMedidas */ },
+                onAddMedidaClick = { navController.navigate(Routes.medidasEntryRoute(pacienteId)) },
+                onMedidaClick = { /* Implementar navegação para detalhes de medida */ },
                 onBackClick = { navController.popBackStack() }
             )
         }
 
-        // --- Telas de Medidas (Futuro) ---
-        /*
-        composable(...) { TelaEdicaoMedidas(...) }
-        composable(...) { TelaDetalhesMedidas(...) }
-        */
+        // --- Nova Tela: Entrada de Medidas (MedidasEntry) ---
+        composable(
+            route = "${Routes.MEDIDAS_ENTRY}/{${Routes.ARG_PACIENTE_ID}}",
+            arguments = listOf(navArgument(Routes.ARG_PACIENTE_ID) { type = NavType.IntType })
+        ) { backStackEntry ->
+            val pacienteId = backStackEntry.arguments?.getInt(Routes.ARG_PACIENTE_ID) ?: -1
+
+            // A ViewModel de Resultado é usada para DISPARAR o cálculo e carregar a TelaResultado
+            val resultadoViewModel: ResultadoViewModel = viewModel(factory = AppViewModelProvider.Factory)
+
+            TelaEntradaMedidas(
+                pacienteId = pacienteId,
+                resultadoViewModel = resultadoViewModel,
+                onSaveAndNavigate = {
+                    navController.navigate(Routes.RESULTADO_AVALIACAO)
+                },
+                onCancel = { navController.popBackStack() }
+            )
+        }
+
+        // --- Nova Tela: Resultado da Avaliação (TelaResultado) ---
+        composable(route = Routes.RESULTADO_AVALIACAO) {
+            // Reutiliza a mesma ViewModel que foi preenchida na TelaEntradaMedidas
+            TelaResultado(
+                viewModel = viewModel(factory = AppViewModelProvider.Factory)
+            )
+        }
     }
 }

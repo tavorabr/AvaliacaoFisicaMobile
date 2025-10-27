@@ -1,4 +1,4 @@
-// NOVO ARQUIVO: com.example.calculadoracorpo.data.model.ResultadoAvaliacao.kt
+package com.example.calculadoracorpo.data.model
 
 data class ResultadoAvaliacao(
     val avaliacaoId: Long,
